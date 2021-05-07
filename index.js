@@ -1,20 +1,12 @@
 const puppeteer = require('puppeteer');
 const notifier = require('node-notifier');
+const configTrain = require('./configTrain');
 
 const config = {
-  from: '', // Наименование станции отправления, пример: МИНСК-ПАССАЖИРСКИЙ
-  to: '', // Наименование станции прибытия, пример: БРЕСТ-ЦЕНТРАЛЬНЫЙ
-  date: '', // Дата поездки, пример: 03.05.2018
-  trainNumber: '', // Номер поезда, пример: 607Б
-  ticketCount: 2, // Количество билетов
-
+  configTrain,
   headless: true, // Запуск в режиме браузера false
   selectors: {
-    from: 'input[id$="form1:textDepStat"]',
-    to: 'input[id$="form1:textArrStat"]',
-    date: 'input[id$="form1:dob"]',
-    search: 'input[id$="form1:buttonSearch"]',
-    table: 'table[id$="form2:tableEx1"]'
+    table: '.sch-table__row-wrap'
   }
 };
 
@@ -22,48 +14,47 @@ let ticketsFound = false;
 let message = '';
 let trainFound = false;
 
-const startParser = async () => {
+var startParser = async () => {
   const browser = await puppeteer.launch({ headless: config.headless });
   const page = await browser.newPage();
   await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 2 });
-  await page.goto('https://poezd.rw.by/wps/portal/home/rp/schedule');
-  await page.type(config.selectors.from, config.from);
-  await page.type(config.selectors.to, config.to);
-  await page.$eval(config.selectors.date, elem => elem.value = '');
-  await page.type(config.selectors.date, config.date);
-  await page.click(config.selectors.search);
-  await page.waitForNavigation();
+  await page.goto(`https://pass.rw.by/ru/route/?from=${config.configTrain.from}&to=${config.configTrain.to}&date=${config.configTrain.date}`);
 
   // const trainCount = await page.$$eval(config.selectors.table + ' > tbody > tr', table => table.length);
   // console.log('Найдено поездов: ', trainCount || 0);
 
   const checkTrain = async () => {
-    const train = await page.$$eval(config.selectors.table + ' > tbody > tr',
+    const train = await page.$$eval(config.selectors.table,
       (trainRow, trainNumber) => trainRow.reduce((result, item) => {
-        if (item.querySelector('span').innerText.indexOf(trainNumber) !== -1) {
-          result.name = item.querySelector('span > a > span').innerText;
-          const [, , , , , , , ...places] = item.childNodes;
-          result.places = places.map(tr => tr.firstChild.innerText);
+        if (item.querySelector('.train-number').innerText.indexOf(trainNumber) !== -1) {
+          result.name = item.querySelector('.train-route').innerText;
+          places = []
+          item.querySelectorAll('.sch-table__t-item').forEach((el) => {
+            places.push({
+              type: item.querySelector('.sch-table__t-name').innerText,
+              tickets: item.querySelector('.sch-table__t-quant > span').innerText,
+            })
+          })
+          result.places = places
         }
         return result;
-      }, {}), config.trainNumber);
+      }, {}), config.configTrain.trainNumber);
 
-    const [, , , , , , , ...headers] = await page.$$eval(config.selectors.table + ' > thead > tr > th',
-      item => item.map(th => th.children.length ? th.querySelector('span').innerText.slice(0, -3) : ''));
     if (train.name) {
-      const places = train.places.map((item, key) => {
+      const places = train.places.map((item) => {
+        const tickets = parseInt(item.tickets) | 0
+        const type = item.type
         return {
-          type: headers[key],
-          tickets: parseInt(item) || 0
+          type,
+          tickets,
         }
       });
-
-      ticketsFound = places.some(item => item.tickets >= config.ticketCount);
+      ticketsFound = places.some(item => item.tickets >= config.configTrain.ticketCount);
       trainFound = true;
       message = places.reduce((message, item) => message + `${item.type}: ${item.tickets} `, '');
       console.log('check train');
     } else {
-      console.log('Поезд не найден ' + config.trainNumber);
+      console.log('Поезд не найден ' + config.configTrain.trainNumber);
       await browser.close();
     }
   };
@@ -72,9 +63,9 @@ const startParser = async () => {
 
   const ticketFound = () => {
     notifier.notify({
-      title: 'Билеты найдены на поезд ' + config.trainNumber,
+      title: 'Билеты найдены на поезд ' + config.configTrain.trainNumber,
       message,
-      sound: true
+      sound: true,
     });
     console.log(message);
   };
@@ -96,7 +87,7 @@ const startParser = async () => {
 
 };
 
-if (config.from.length && config.to.length && config.date && config.trainNumber.length) {
+if (config.configTrain.from.length && config.configTrain.to.length && config.configTrain.date && config.configTrain.trainNumber.length) {
   startParser();
 } else {
   console.log('Введите номер поезда, станцию отправления, станцию назначения и дату.')
