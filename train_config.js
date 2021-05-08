@@ -1,4 +1,4 @@
-const configTrain = {
+const trainConfig = {
     from: '', // Наименование станции отправления, пример: МИНСК-ПАССАЖИРСКИЙ
     to: '', // Наименование станции прибытия, пример: БРЕСТ-ЦЕНТРАЛЬНЫЙ
     date: '', // Дата поездки, пример: 2018-05-08
@@ -6,4 +6,4 @@ const configTrain = {
     ticketCount: 1, // Количество билетов
 }
 
-module.exports = configTrain;
+module.exports = trainConfig;

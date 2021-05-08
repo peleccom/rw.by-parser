@@ -1,9 +1,9 @@
 const puppeteer = require('puppeteer');
 const notifier = require('node-notifier');
-const configTrain = require('./configTrain');
+const trainConfig = require('./train_config');
 
 const config = {
-  configTrain,
+  trainConfig,
   headless: true, // Запуск в режиме браузера false
   selectors: {
     table: '.sch-table__row-wrap'
@@ -18,7 +18,7 @@ var startParser = async () => {
   const browser = await puppeteer.launch({ headless: config.headless });
   const page = await browser.newPage();
   await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 2 });
-  await page.goto(`https://pass.rw.by/ru/route/?from=${config.configTrain.from}&to=${config.configTrain.to}&date=${config.configTrain.date}`);
+  await page.goto(`https://pass.rw.by/ru/route/?from=${config.trainConfig.from}&to=${config.trainConfig.to}&date=${config.trainConfig.date}`);
 
   // const trainCount = await page.$$eval(config.selectors.table + ' > tbody > tr', table => table.length);
   // console.log('Найдено поездов: ', trainCount || 0);
@@ -38,7 +38,7 @@ var startParser = async () => {
           result.places = places
         }
         return result;
-      }, {}), config.configTrain.trainNumber);
+      }, {}), config.trainConfig.trainNumber);
 
     if (train.name) {
       const places = train.places.map((item) => {
@@ -49,12 +49,12 @@ var startParser = async () => {
           tickets,
         }
       });
-      ticketsFound = places.some(item => item.tickets >= config.configTrain.ticketCount);
+      ticketsFound = places.some(item => item.tickets >= config.trainConfig.ticketCount);
       trainFound = true;
       message = places.reduce((message, item) => message + `${item.type}: ${item.tickets} `, '');
       console.log('check train');
     } else {
-      console.log('Поезд не найден ' + config.configTrain.trainNumber);
+      console.log('Поезд не найден ' + config.trainConfig.trainNumber);
       await browser.close();
     }
   };
@@ -63,7 +63,7 @@ var startParser = async () => {
 
   const ticketFound = () => {
     notifier.notify({
-      title: 'Билеты найдены на поезд ' + config.configTrain.trainNumber,
+      title: 'Билеты найдены на поезд ' + config.trainConfig.trainNumber,
       message,
       sound: true,
     });
@@ -87,7 +87,7 @@ var startParser = async () => {
 
 };
 
-if (config.configTrain.from.length && config.configTrain.to.length && config.configTrain.date && config.configTrain.trainNumber.length) {
+if (config.trainConfig.from.length && config.trainConfig.to.length && config.trainConfig.date && config.trainConfig.trainNumber.length) {
   startParser();
 } else {
   console.log('Введите номер поезда, станцию отправления, станцию назначения и дату.')
