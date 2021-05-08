@@ -19,7 +19,6 @@ function formatDate(d) {
 }
 
 const startParser = async (trainConfig) => {
-  console.log(trainConfig);
   const browser = await puppeteer.launch({ headless: config.headless });
   const page = await browser.newPage();
   await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 2 });
@@ -40,10 +39,17 @@ const startParser = async (trainConfig) => {
           if (item.querySelector('.train-number').innerText.indexOf(trainNumber) !== -1) {
             result.name = item.querySelector('.train-route').innerText;
             places = [];
+            let prevType = null
             item.querySelectorAll('.sch-table__t-item').forEach((el) => {
+              let type = el.querySelector('.sch-table__t-name').innerText
+              if (!type && prevType) {
+                type = prevType
+              }
+              prevType = type
               places.push({
-                type: item.querySelector('.sch-table__t-name').innerText,
-                tickets: item.querySelector('.sch-table__t-quant > span').innerText,
+                type: type,
+                tickets: el.querySelector('.sch-table__t-quant > span').innerText,
+                cost: el.querySelector('.ticket-cost').innerText,
               });
             });
             result.places = places;
@@ -55,11 +61,10 @@ const startParser = async (trainConfig) => {
 
     if (train.name) {
       const places = train.places.map((item) => {
-        const tickets = parseInt(item.tickets) | 0;
-        const type = item.type;
         return {
-          type,
-          tickets,
+          type: item.type,
+          tickets: parseInt(item.tickets) | 0,
+          cost: parseFloat(item.cost.replace(',', '.')),
         };
       });
       ticketsFound = places.some((item) => item.tickets >= trainConfig.ticketCount);
@@ -100,8 +105,8 @@ const startParser = async (trainConfig) => {
 };
 
 const argv = yargs(hideBin(process.argv))
-  .usage('Usage: $0 -f [from] -t [to] -d [date] -n [trainNumber] -t [count]')
-  .example('$0 -f Минск -t Брест -d 2020-05-08 -n 704Б -t 1')
+  .usage('Usage: $0 -f [from] -t [to] -d [date] -n [trainNumber] -c [count]')
+  .example('$0 -f Минск -t Брест -d 2020-05-08 -n 704Б -c 1')
   .option('f', {
     alias: 'from',
     describe: 'Наименование станции отправления, пример: МИНСК-ПАССАЖИРСКИЙ',
