@@ -15,7 +15,7 @@ let message = '';
 let trainFound = false;
 
 function formatDate(d) {
-  return `${d.getFullYear()}-${d.getDate()}-${d.getMonth() + 1}`;
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
 const startParser = async (trainConfig) => {
@@ -119,9 +119,12 @@ const argv = yargs(hideBin(process.argv))
   })
   .option('d', {
     alias: 'date',
-    describe: 'Дата поездки, пример: 2018-05-08, сегодня, завтра',
+    describe: 'Дата поездки (год-месяц-день), пример: 2018-05-20, сегодня, завтра',
     type: 'string',
     coerce: (arg) => {
+      if (arg === undefined){
+        return arg
+      }
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (arg === 'сегодня') {
