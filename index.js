@@ -18,10 +18,21 @@ function formatDate(d) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
-const startParser = async (trainConfig) => {
+
+function notifyTicketFound (message, trainNumber) {
+  notifier.notify({
+    title: `Билеты найдены на поезд ${trainNumber}`,
+    message,
+    sound: true,
+  });
+  console.log(message);
+};
+
+const startTicketsParser = async (trainConfig) => {
   const browser = await puppeteer.launch({ headless: config.headless });
   const page = await browser.newPage();
   await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 2 });
+
   await page.goto(
     `https://pass.rw.by/ru/route/?from=${trainConfig.from}&to=${trainConfig.to}&date=${formatDate(
       trainConfig.date,
@@ -70,23 +81,13 @@ const startParser = async (trainConfig) => {
       ticketsFound = places.some((item) => item.tickets >= trainConfig.ticketCount);
       trainFound = true;
       message = places.reduce((message, item) => message + `${item.type}: ${item.tickets} `, '');
-      console.log('check train');
     } else {
-      console.log('Поезд не найден ' + trainConfig.trainNumber);
+      console.log(`Поезд не найден ${trainConfig.trainNumber}`);
       await browser.close();
     }
   };
 
   await checkTrain();
-
-  const ticketFound = () => {
-    notifier.notify({
-      title: 'Билеты найдены на поезд ' + trainConfig.trainNumber,
-      message,
-      sound: true,
-    });
-    console.log(message);
-  };
 
   if (!ticketsFound && trainFound) {
     let delay = setInterval(async () => {
@@ -94,12 +95,12 @@ const startParser = async (trainConfig) => {
       await page.reload();
       if (ticketsFound) {
         clearInterval(delay);
-        ticketFound();
+        notifyTicketFound(message, trainConfig.trainNumber);
         await browser.close();
       }
     }, 60000);
   } else {
-    ticketFound();
+    notifyTicketFound(message, trainConfig.trainNumber);
     await browser.close();
   }
 };
@@ -166,7 +167,7 @@ const argv = yargs(hideBin(process.argv))
     'Введите номер поезда, станцию отправления, станцию назначения и дату',
   ).argv;
 
-startParser({
+startTicketsParser({
   from: argv.from,
   to: argv.to,
   date: argv.date,
