@@ -53,14 +53,23 @@ async function getTrain (trainConfig, page) {
       }, {}),
     trainConfig.trainNumber,
   );
-  const places = train.places.map((item) => {
-    return {
-      type: item.type,
-      tickets: parseInt(item.tickets) | 0,
-      cost: parseFloat(item.cost.replace(',', '.')).toString(),
-    };
-  });
-  train.places = places;
+
+  if (!train.name) {
+    return null
+  }
+
+  if (train.places) {
+    const places = train.places.map((item) => {
+      return {
+        type: item.type,
+        tickets: parseInt(item.tickets) | 0,
+        cost: parseFloat(item.cost.replace(',', '.')).toString(),
+      };
+    });
+    train.places = places;
+  }
+
+
   return train;
 }
 
@@ -77,15 +86,12 @@ async function createBrowserPage (url) {
 const startTicketsParser = async (trainConfig) => {
   let ticketsFound = false;
   let message = '';
-  let trainFound = false;
   let browser
   let page
 
   ({browser, page} = await createBrowserPage(`https://pass.rw.by/ru/route/?from=${trainConfig.from}&to=${trainConfig.to}&date=${formatDate(
     trainConfig.date,
   )}`))
-
-  await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 2 });
 
   while (true) {
     await page.reload();
@@ -99,27 +105,17 @@ const startTicketsParser = async (trainConfig) => {
 
     const train = await getTrain(trainConfig, page);
 
-    if (train.name) {
-      const places = train.places.map((item) => {
-        return {
-          type: item.type,
-          tickets: parseInt(item.tickets) | 0,
-          cost: parseFloat(item.cost.replace(',', '.')),
-        };
-      });
-      ticketsFound = places.some((item) => item.tickets >= trainConfig.ticketCount);
-      trainFound = true;
-      message = places.reduce((message, item) => `${message}${item.type}: ${item.tickets} `, '');
-    } else {
-      trainFound = false
-    }
-
-    if (!trainFound) {
+    if (!train) {
       console.log(`Поезд не найден ${trainConfig.trainNumber}`);
       await browser.close();
       return
     }
-    if (trainFound && ticketsFound) {
+
+    ticketsFound = train.places.some((item) => item.tickets >= trainConfig.ticketCount);
+    message = train.places.reduce((message, item) => `${message}${item.type}: ${item.tickets} `, '');
+
+
+    if (ticketsFound) {
       notifyTicketFound(message, trainConfig.trainNumber);
       await browser.close();
       return

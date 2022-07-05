@@ -56,3 +56,13 @@ test('check get train multiple types', async () => {
     expect(train.places[0].type).toBe('Плацкартный')
     expect(train.places[1].type).toBe('Купейный')
 })
+
+test('check get train train not exists', async () => {
+    let browser, page;
+    ({browser, page} = await app.createBrowserPage(TEST_FILE))
+
+    const train = await app.getTrain({trainNumber: '100А'}, page)
+    await browser.close()
+
+    expect(train).toBe(null)
+})
