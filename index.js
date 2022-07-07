@@ -1,13 +1,20 @@
-const puppeteer = require('puppeteer');
 const notifier = require('node-notifier');
 const yargs = require('yargs/yargs');
+const axios = require('axios').default;
 const fs = require('fs');
+const cheerio = require('cheerio');
 const { hideBin } = require('yargs/helpers');
 
 const config = {
-  headless: true, // Запуск в режиме браузера false
   selectors: {
-    table: '.sch-table__row-wrap',
+    trainRow: '.sch-table__row-wrap',
+    trainRowNumber: '.train-number',
+    trainRowRoute: '.train-route',
+
+    trainRowPlace: '.sch-table__t-item',
+    trainRowPlaceCost: '.ticket-cost',
+    trainRowPlaceCount: '.sch-table__t-quant > span',
+    trainRowPlaceName: '.sch-table__t-name',
   },
 };
 
@@ -26,88 +33,76 @@ function notifyTicketFound(message, trainNumber) {
   console.log(message);
 }
 
-async function getTrain (trainConfig, page) {
-  const train = await page.$$eval(
-    config.selectors.table,
-    (trainRow, trainNumber) =>
-      trainRow.reduce((result, item) => {
-        if (item.querySelector('.train-number').innerText.indexOf(trainNumber) !== -1) {
-          result.name = item.querySelector('.train-route').innerText;
-          places = [];
-          let prevType = null;
-          item.querySelectorAll('.sch-table__t-item').forEach((el) => {
-            let type = el.querySelector('.sch-table__t-name').innerText;
-            if (!type && prevType) {
-              type = prevType;
-            }
-            prevType = type;
-            places.push({
-              type: type,
-              tickets: el.querySelector('.sch-table__t-quant > span').innerText,
-              cost: el.querySelector('.ticket-cost').innerText,
-            });
-          });
-          result.places = places;
+
+async function getTrain (trainConfig, content) {
+  const $ = cheerio.load(content);
+
+  for (let item of $(config.selectors.trainRow)) {
+    const $trainRowItem = $(item);
+    const trainNumber = $trainRowItem.find(config.selectors.trainRowNumber).text().trim();
+    if (trainNumber === trainConfig.trainNumber) {
+      const places = [];
+      const trainRoute = $trainRowItem.find(config.selectors.trainRowRoute).text().trim();
+      let prevType = null;
+      for (let place of $trainRowItem.find(config.selectors.trainRowPlace)) {
+        const $placeItem = $(place);
+        let type = $placeItem.find(config.selectors.trainRowPlaceName).text().trim();
+
+        let tickets = $placeItem.find(config.selectors.trainRowPlaceCount).text().trim();
+        tickets = parseInt(tickets) | 0;
+
+        let cost = $placeItem.find(config.selectors.trainRowPlaceCost).text().trim();
+        cost = parseFloat(cost.replace(',', '.')).toString();
+
+        if (!type && prevType) {
+          type = prevType;
         }
-        return result;
-      }, {}),
-    trainConfig.trainNumber,
-  );
+        prevType = type;
 
-  if (!train.name) {
-    return null
-  }
+        places.push({
+          type,
+          tickets,
+          cost,
+        });
+      }
 
-  if (train.places) {
-    const places = train.places.map((item) => {
       return {
-        type: item.type,
-        tickets: parseInt(item.tickets) | 0,
-        cost: parseFloat(item.cost.replace(',', '.')).toString(),
-      };
-    });
-    train.places = places;
+        name: trainRoute,
+        places,
+      }
+    }
   }
 
-
-  return train;
+  return null;
 }
 
-async function createBrowserPage (url) {
-  const browser = await puppeteer.launch({ headless: config.headless });
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 2 });
-  await page.goto(url);
-  return {
-    browser, page,
-  }
+
+async function loadPageContent (url) {
+  url = encodeURI(url);
+  return await axios.get(url).then((response) => response.data)
 }
 
 const startTicketsParser = async (trainConfig) => {
   let ticketsFound = false;
   let message = '';
-  let browser
-  let page
 
-  ({browser, page} = await createBrowserPage(`https://pass.rw.by/ru/route/?from=${trainConfig.from}&to=${trainConfig.to}&date=${formatDate(
+  const url = `https://pass.rw.by/ru/route/?from=${trainConfig.from}&to=${trainConfig.to}&date=${formatDate(
     trainConfig.date,
-  )}`))
+  )}`
 
   while (true) {
-    await page.reload();
+    const content = await loadPageContent(url)
 
     if (debug) {
-      const html = await page.content();
-      fs.writeFile('page.html', html, (err) => {
+      fs.writeFile('page.html', content, (err) => {
         if (err) return console.log(err);
       });
     }
 
-    const train = await getTrain(trainConfig, page);
+    const train = await getTrain(trainConfig, content);
 
     if (!train) {
       console.log(`Поезд не найден ${trainConfig.trainNumber}`);
-      await browser.close();
       return
     }
 
@@ -117,7 +112,6 @@ const startTicketsParser = async (trainConfig) => {
 
     if (ticketsFound) {
       notifyTicketFound(message, trainConfig.trainNumber);
-      await browser.close();
       return
     }
     await waitInterval(60000)
@@ -212,7 +206,7 @@ if (require.main === module) {
 
 module.exports = {
   startTicketsParser,
-  createBrowserPage,
   getTrain,
+  loadPageContent,
 }
 

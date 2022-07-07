@@ -1,7 +1,8 @@
 const app = require('./index');
+const fs = require('fs');
 
 jest.setTimeout(60000)
-const TEST_FILE = `file://${__dirname}/tests/test.html`;
+const TEST_FILE = `${__dirname}/tests/test.html`;
 
 xtest('test 1', async () => {
     const today = new Date();
@@ -17,13 +18,16 @@ xtest('test 1', async () => {
     expect(1).toBe(1);
 });
 
+function load() {
+    return fs.readFileSync(TEST_FILE);
+}
+
 test('check get train', async () => {
-    let browser, page;
-    ({browser, page} = await app.createBrowserPage(TEST_FILE))
+    const content = await load()
 
+    const train = await app.getTrain({trainNumber: '704Б'}, content)
 
-    const train = await app.getTrain({trainNumber: '704Б'}, page)
-    await browser.close()
+    // expect(train.name).toBe('Минск-Пассажирский — Витебск')
 
     expect(train.places.length).toBe(3)
     expect(train.places[0].tickets).toBe(1)
@@ -40,12 +44,11 @@ test('check get train', async () => {
 })
 
 test('check get train multiple types', async () => {
-    let browser, page;
-    ({browser, page} = await app.createBrowserPage(TEST_FILE))
+    const content = await load()
 
-    const train = await app.getTrain({trainNumber: '680Б'}, page)
-    await browser.close()
+    const train = await app.getTrain({trainNumber: '680Б'}, content)
 
+    // expect(train.name).toBe('Гродно - Витебск')
     expect(train.places.length).toBe(2)
     expect(train.places[0].tickets).toBe(42)
     expect(train.places[1].tickets).toBe(5)
@@ -58,11 +61,9 @@ test('check get train multiple types', async () => {
 })
 
 test('check get train train not exists', async () => {
-    let browser, page;
-    ({browser, page} = await app.createBrowserPage(TEST_FILE))
+    const content = await load()
 
-    const train = await app.getTrain({trainNumber: '100А'}, page)
-    await browser.close()
+    const train = await app.getTrain({trainNumber: '100А'}, content)
 
     expect(train).toBe(null)
 })
