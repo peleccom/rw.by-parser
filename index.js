@@ -83,12 +83,15 @@ async function loadPageContent (url) {
 }
 
 const startTicketsParser = async (trainConfig) => {
+  const formattedDate = formatDate(
+    trainConfig.date,
+  )
+  console.log(`Поиск билетов ${trainConfig.from}->${trainConfig.to} ${formattedDate}`)
   let ticketsFound = false;
   let message = '';
 
-  const url = `https://pass.rw.by/ru/route/?from=${trainConfig.from}&to=${trainConfig.to}&date=${formatDate(
-    trainConfig.date,
-  )}`
+  const url = `https://pass.rw.by/ru/route/?from=${trainConfig.from}&to=${trainConfig.to}&date=${formattedDate}`
+  let firstScanIteration = true;
 
   while (true) {
     const content = await loadPageContent(url)
@@ -113,6 +116,10 @@ const startTicketsParser = async (trainConfig) => {
     if (ticketsFound) {
       notifyTicketFound(message, trainConfig.trainNumber);
       return
+    }
+    if (firstScanIteration) {
+      console.log('Билеы не найдены. Будет произведено переодическое сканирование. Пожалуйста ждите...');
+      firstScanIteration = false;
     }
     await waitInterval(60000)
   }
@@ -162,6 +169,10 @@ function main() {
         if (isNaN(date) || date < today) {
           throw Error(`Неверная дата: ${arg}`);
         }
+        if (date.getFullYear() !== today.getFullYear() && date.getFullYear() !== today.getFullYear() + 1) {
+          throw Error(`Неверный год ${date.getFullYear()}`)
+        }
+
         return date;
       },
     })
