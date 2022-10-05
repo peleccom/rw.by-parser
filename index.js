@@ -31,12 +31,12 @@ function notifyTicketFound(message, trainNumber) {
     sound: true,
   });
   console.log(message);
+  return message;
 }
 
 
 async function getTrain (trainConfig, content) {
   const $ = cheerio.load(content);
-
   for (let item of $(config.selectors.trainRow)) {
     const $trainRowItem = $(item);
     const trainNumber = $trainRowItem.find(config.selectors.trainRowNumber).text().trim();
@@ -82,11 +82,30 @@ async function loadPageContent (url) {
   return await axios.get(url).then((response) => response.data)
 }
 
-const startTicketsParser = async (trainConfig) => {
+function filterPlaces(places, trainConfig) {
+  if (trainConfig.priceExclude) {
+    // filter out by price
+    places = places.filter((item) => item.cost != trainConfig.priceExclude)
+  }
+
+  if (trainConfig.typeExclude) {
+    // filter out by place type
+    places = places.filter((item) => item.type != trainConfig.typeExclude)
+  }
+
+
+  // filter number of places
+  places = places.filter((item) => item.tickets >= trainConfig.ticketCount);
+
+
+  return places
+}
+
+async function startTicketsParser (trainConfig) {
   const formattedDate = formatDate(
     trainConfig.date,
   )
-  console.log(`Поиск билетов ${trainConfig.from}->${trainConfig.to} ${formattedDate}`)
+  console.log(`Поиск билетов ${trainConfig.from}->${trainConfig.to} (${trainConfig.trainNumber}) ${formattedDate}`)
   let ticketsFound = false;
   let message = '';
 
@@ -109,17 +128,19 @@ const startTicketsParser = async (trainConfig) => {
       return
     }
 
-    ticketsFound = train.places.some((item) => item.tickets >= trainConfig.ticketCount);
-    message = train.places.reduce((message, item) => `${message}${item.type}: ${item.tickets} `, '');
+    const filteredPlaces = filterPlaces(train.places, trainConfig)
+    ticketsFound = !!filteredPlaces.length
+    message = filteredPlaces.reduce((message, item) => `${message}${item.type} (${item.cost} руб.): ${item.tickets}\n`, '');
 
 
     if (ticketsFound) {
-      notifyTicketFound(message, trainConfig.trainNumber);
-      return
+      return notifyTicketFound(message, trainConfig.trainNumber);
     }
     if (firstScanIteration) {
-      console.log('Билеы не найдены. Будет произведено переодическое сканирование. Пожалуйста ждите...');
+      console.log('Билеты не найдены. Будет произведено переодическое сканирование. Пожалуйста ждите...');
       firstScanIteration = false;
+    } else {
+      console.log('Билеты не появились')
     }
     await waitInterval(60000)
   }
@@ -195,6 +216,16 @@ function main() {
         return count;
       },
     })
+    .option('priceExclude', {
+      alias: 'x',
+      describe: 'Исключить билеты с ценой',
+      type: 'string',
+    })
+    .option('typeExclude', {
+      alias: 'z',
+      describe: 'Исключить билеты с типом',
+      type: 'string',
+    })
     .demandOption(
       ['f', 't', 'd', 'n', 'c'],
       'Введите номер поезда, станцию отправления, станцию назначения и дату',
@@ -206,6 +237,8 @@ function main() {
     date: argv.date,
     trainNumber: argv.number,
     ticketCount: argv.count,
+    priceExclude: argv.priceExclude,
+    typeExclude: argv.typeExclude,
   });
 }
 
