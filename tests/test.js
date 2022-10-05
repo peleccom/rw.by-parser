@@ -41,7 +41,7 @@ test('test tickets exclude price', async () => {
         date: new Date(2022, 4, 27),
         trainNumber: '680Б',
         ticketCount: 1,
-        priceExclude: '13.18'
+        priceExclude: ['13.18']
     })
     res = res.trim()
     expect(res).toBe('Купейный (18.26 руб.): 5')
@@ -58,7 +58,7 @@ test('test tickets exclude type', async () => {
         date: new Date(2022, 4, 27),
         trainNumber: '680Б',
         ticketCount: 1,
-        typeExclude: 'Купейный'
+        typeExclude: ['Купейный']
     })
     res = res.trim()
     expect(res).toBe('Плацкартный (13.18 руб.): 42')

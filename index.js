@@ -83,14 +83,14 @@ async function loadPageContent (url) {
 }
 
 function filterPlaces(places, trainConfig) {
-  if (trainConfig.priceExclude) {
+  if (trainConfig.priceExclude &&  Array.isArray(trainConfig.priceExclude) && trainConfig.priceExclude.length) {
     // filter out by price
-    places = places.filter((item) => item.cost != trainConfig.priceExclude)
+    places = places.filter((item) => !trainConfig.priceExclude.includes(item.cost))
   }
 
-  if (trainConfig.typeExclude) {
+  if (trainConfig.typeExclude && Array.isArray(trainConfig.typeExclude) && trainConfig.typeExclude.length) {
     // filter out by place type
-    places = places.filter((item) => item.type != trainConfig.typeExclude)
+    places = places.filter((item) => !trainConfig.typeExclude.includes(item.type))
   }
 
 
@@ -219,18 +219,17 @@ function main() {
     .option('priceExclude', {
       alias: 'x',
       describe: 'Исключить билеты с ценой',
-      type: 'string',
+      type: 'array',
     })
     .option('typeExclude', {
       alias: 'z',
       describe: 'Исключить билеты с типом',
-      type: 'string',
+      type: 'array',
     })
     .demandOption(
       ['f', 't', 'd', 'n', 'c'],
       'Введите номер поезда, станцию отправления, станцию назначения и дату',
     ).argv;
-
   startTicketsParser({
     from: argv.from,
     to: argv.to,
