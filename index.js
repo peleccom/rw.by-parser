@@ -220,11 +220,13 @@ function main() {
       alias: 'x',
       describe: 'Исключить билеты с ценой',
       type: 'array',
+      string: true,
     })
     .option('typeExclude', {
       alias: 'z',
       describe: 'Исключить билеты с типом',
       type: 'array',
+      string: true,
     })
     .demandOption(
       ['f', 't', 'd', 'n', 'c'],
